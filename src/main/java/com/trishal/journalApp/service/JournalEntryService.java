@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -30,9 +31,11 @@ public class JournalEntryService {
     public void saveEntry(JournalEntry journalEntry, String userName){
         try {
             User user = userService.findByUserName(userName);
-            JournalEntry savedJournalEntry = journalEntryRepo.save(journalEntry);
-            user.getJournalEntries().add(savedJournalEntry);
-            userService.saveEntry(user);
+            if (Objects.isNull(user)){
+                throw new RuntimeException("User not found " + userName);
+            }
+            journalEntry.setUser(user);
+            journalEntryRepo.save(journalEntry);
         }
         catch (Exception e){
             logger.error("Exception: ", e);

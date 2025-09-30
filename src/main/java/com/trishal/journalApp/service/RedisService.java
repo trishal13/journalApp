@@ -6,6 +6,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
+import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 
 @Slf4j
@@ -19,6 +20,9 @@ public class RedisService {
         try {
             Object o = redisTemplate.opsForValue().get(key);
             ObjectMapper mapper = new ObjectMapper();
+            if (Objects.isNull(o)){
+                return (T) o;
+            }
             return mapper.readValue(o.toString(), entityClass);
         }
         catch (Exception e){

@@ -1,6 +1,11 @@
 package com.trishal.journalApp.controller;
 
+import com.trishal.journalApp.dto.UserLoginRequestDto;
+import com.trishal.journalApp.dto.UserLoginResponseDto;
+import com.trishal.journalApp.dto.UserRegistrationRequestDto;
+import com.trishal.journalApp.dto.UserResponseDto;
 import com.trishal.journalApp.entity.User;
+import com.trishal.journalApp.mapper.UserMapper;
 import com.trishal.journalApp.service.UserService;
 import com.trishal.journalApp.service.impl.UserDetailServiceImpl;
 import com.trishal.journalApp.utils.JwtUtil;
@@ -31,34 +36,48 @@ public class PublicController {
     @Autowired
     private JwtUtil jwtUtil;
 
+    @Autowired
+    private UserMapper userMapper;
+
     @GetMapping("/health-check")
     public String healthCheck(){
         return "Ok";
     }
 
     @PostMapping("/signup")
-    public ResponseEntity<User> signup(@RequestBody User newUser){
+    public ResponseEntity<UserResponseDto> signup(@RequestBody UserRegistrationRequestDto newUserRequest){
         try{
+            User newUser = userMapper.toEntity(newUserRequest);
             userService.saveNewUser(newUser);
-            return new ResponseEntity<>(newUser, HttpStatus.CREATED);
+            UserResponseDto userResponseDto = userMapper.toResponse(newUser);
+            return new ResponseEntity<>(userResponseDto, HttpStatus.CREATED);
         }
         catch (Exception e){
+            log.error("Error during new user signup!");
             return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
         }
     }
 
     @PostMapping("/login")
-    public ResponseEntity<String> login(@RequestBody User user){
+    public ResponseEntity<UserLoginResponseDto> login(@RequestBody UserLoginRequestDto userLoginRequestDto){
         try{
             Authentication authenticate = authenticationManager.authenticate(
-                    new UsernamePasswordAuthenticationToken(user.getUserName(), user.getPassword()));
-            UserDetails userDetails = userDetailService.loadUserByUsername(user.getUserName());
+                    new UsernamePasswordAuthenticationToken(userLoginRequestDto.getUserName(), userLoginRequestDto.getPassword()));
+            UserDetails userDetails = userDetailService.loadUserByUsername(userLoginRequestDto.getUserName());
             String jwtToken = jwtUtil.generateToken(userDetails.getUsername());
-            return new ResponseEntity<>(jwtToken, HttpStatus.OK);
+            User user = userService.findByUserName(userLoginRequestDto.getUserName());
+            UserLoginResponseDto userLoginResponseDto = UserLoginResponseDto.builder()
+                    .token(jwtToken)
+                    .tokenType("Bearer")
+                    .userName(user.getUserName())
+                    .roles(user.getRoles())
+                    .expiresIn(3600)
+                    .build();
+            return new ResponseEntity<>(userLoginResponseDto, HttpStatus.OK);
         }
         catch (Exception e){
-            log.error("Exception occured while createAuthenticationToken ", e);
-            return new ResponseEntity<>("Incorrect userName or password", HttpStatus.BAD_REQUEST);
+            log.error("Exception occured while user login ", e);
+            return new ResponseEntity<>(HttpStatus.UNAUTHORIZED);
         }
     }
 

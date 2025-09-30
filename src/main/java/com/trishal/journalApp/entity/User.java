@@ -34,7 +34,7 @@ public class User {
 
     private boolean sentimentAnalysis;
 
-    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private List<JournalEntry> journalEntries = new ArrayList<>();
 
     private List<String> roles;
