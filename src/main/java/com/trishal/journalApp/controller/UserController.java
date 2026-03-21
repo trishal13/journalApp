@@ -23,44 +23,40 @@ public class UserController {
     @Autowired
     private WeatherService weatherService;
 
-
     @PutMapping
-    public ResponseEntity<User> updateUser(@RequestBody User newUser){
+    public ResponseEntity<User> updateUser(@RequestBody User newUser) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         String userName = authentication.getName();
-        User oldUser = userService.findByUserName(userName);
-        if (Objects.isNull(oldUser)){
-            return new ResponseEntity<>(HttpStatus.NO_CONTENT);
-        }
-        if (!newUser.getUserName().isEmpty()){
+        User oldUser = userService.findByUserName(userName); // throws UserNotFoundException if missing
+
+        if (newUser.getUserName() != null && !newUser.getUserName().isEmpty()) {
             oldUser.setUserName(newUser.getUserName());
         }
-        if (!newUser.getPassword().isEmpty()){
-            oldUser.setPassword(oldUser.getPassword());
+        // BUG FIX: was setting oldUser.getPassword() (no change) instead of newUser.getPassword()
+        if (newUser.getPassword() != null && !newUser.getPassword().isEmpty()) {
+            oldUser.setPassword(newUser.getPassword());
         }
-        userService.saveNewUser(oldUser);
+        userService.saveNewUser(oldUser); // re-encodes password
         return new ResponseEntity<>(oldUser, HttpStatus.OK);
     }
 
     @DeleteMapping
-    public ResponseEntity<User> deleteUser(){
+    public ResponseEntity<Void> deleteUser() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         String userName = authentication.getName();
-        User user = userService.deleteByUserName(userName);
-        return new ResponseEntity<>(user, HttpStatus.NO_CONTENT);
+        userService.deleteByUserName(userName);
+        return new ResponseEntity<>(HttpStatus.NO_CONTENT);
     }
 
     @GetMapping
-    public ResponseEntity<?> greetings(){
+    public ResponseEntity<String> greetings(@RequestParam String city) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         String userName = authentication.getName();
-        WeatherResponse weatherResponse = weatherService.getWeather("Indore");
+        WeatherResponse weatherResponse = weatherService.getWeather(city);
         StringBuilder message = new StringBuilder("Hi " + userName);
-        if (!Objects.isNull(weatherResponse)){
-            message.append(", Weather feelsLike: " + weatherResponse.getCurrent().getFeelslike());
+        if (!Objects.isNull(weatherResponse)) {
+            message.append(", Weather feels like: ").append(weatherResponse.getCurrent().getFeelslike()).append("°C");
         }
         return new ResponseEntity<>(message.toString(), HttpStatus.OK);
     }
-
-
 }

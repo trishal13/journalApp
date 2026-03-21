@@ -8,15 +8,17 @@ import lombok.NoArgsConstructor;
 import java.util.List;
 
 @Data
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
 public class UserLoginResponseDto {
 
     private String token;
+
+    @Builder.Default
     private String tokenType = "Bearer";
+
     private String userName;
     private List<String> roles;
     private long expiresIn;
-
 }

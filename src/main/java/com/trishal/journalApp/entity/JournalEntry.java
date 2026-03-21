@@ -10,14 +10,10 @@ import java.util.UUID;
 
 @Entity
 @Table(name = "journal_entries")
-//@Getter
-//@Setter
+@Data
+@Builder
 @AllArgsConstructor
 @NoArgsConstructor
-//@EqualsAndHashCode
-//@ToString
-//@Builder
-@Data
 public class JournalEntry {
 
     @Id

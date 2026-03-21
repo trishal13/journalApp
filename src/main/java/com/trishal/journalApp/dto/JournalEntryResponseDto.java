@@ -10,9 +10,9 @@ import java.util.Date;
 import java.util.UUID;
 
 @Data
+@Builder
 @AllArgsConstructor
 @NoArgsConstructor
-@Builder
 public class JournalEntryResponseDto {
 
     private UUID id;
@@ -21,5 +21,4 @@ public class JournalEntryResponseDto {
     private Date date;
     private Sentiment sentiment;
     private String authorUserName;
-
 }

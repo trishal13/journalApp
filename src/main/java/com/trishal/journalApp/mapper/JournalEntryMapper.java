@@ -5,18 +5,23 @@ import com.trishal.journalApp.dto.JournalEntryResponseDto;
 import com.trishal.journalApp.entity.JournalEntry;
 import org.springframework.stereotype.Component;
 
-import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Component
 public class JournalEntryMapper {
 
-    public JournalEntry toEntity(JournalEntryCreateRequestDto journalEntryCreateRequestDto){
-        JournalEntry journalEntry = new JournalEntry();
-        journalEntry.setTitle(journalEntryCreateRequestDto.getTitle());
-        journalEntry.setContent(journalEntryCreateRequestDto.getContent());
-        journalEntry.setSentiment(journalEntryCreateRequestDto.getSentiment());
-        return journalEntry;
+    /**
+     * Maps a create-request DTO → JournalEntry entity using the builder.
+     * Note: user and date are intentionally omitted here — the service layer
+     * sets them after ownership is verified.
+     */
+    public JournalEntry toEntity(JournalEntryCreateRequestDto dto) {
+        return JournalEntry.builder()
+                .title(dto.getTitle())
+                .content(dto.getContent())
+                .sentiment(dto.getSentiment())
+                .build();
     }
 
     public JournalEntryResponseDto toResponse(JournalEntry journalEntry) {
@@ -26,17 +31,15 @@ public class JournalEntryMapper {
                 .content(journalEntry.getContent())
                 .date(journalEntry.getDate())
                 .sentiment(journalEntry.getSentiment())
-                .authorUserName(journalEntry.getUser() != null ? journalEntry.getUser().getUserName() : null)
+                .authorUserName(journalEntry.getUser() != null
+                        ? journalEntry.getUser().getUserName()
+                        : null)
                 .build();
     }
 
-    public List<JournalEntryResponseDto> toResponseList(List<JournalEntry> journalEntries){
-        List<JournalEntryResponseDto> journalEntryResponseDtoList = new ArrayList<>();
-        for (JournalEntry journalEntry: journalEntries){
-            JournalEntryResponseDto journalEntryResponseDto=toResponse(journalEntry);
-            journalEntryResponseDtoList.add(journalEntryResponseDto);
-        }
-        return journalEntryResponseDtoList;
+    public List<JournalEntryResponseDto> toResponseList(List<JournalEntry> journalEntries) {
+        return journalEntries.stream()
+                .map(this::toResponse)
+                .collect(Collectors.toList());
     }
-
 }

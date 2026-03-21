@@ -1,0 +1,58 @@
+# =============================================================================
+#  Multi-stage Dockerfile — Journal App
+#  Spring Boot 3.5.5 / Java 17 / Maven 3.9
+#
+#  Build:   docker build -t journal-app .
+#  Run:     docker run -p 8081:8081 --env-file .env journal-app
+# =============================================================================
+
+# ── Stage 1: Build ────────────────────────────────────────────────────────────
+FROM maven:3.9.6-eclipse-temurin-17 AS builder
+
+WORKDIR /app
+
+# ── 1a. Download dependencies first (cached layer) ────────────────────────────
+# Copying only pom.xml means this expensive step only reruns when
+# dependencies actually change, not on every source code change.
+COPY pom.xml .
+RUN mvn dependency:go-offline -B --no-transfer-progress
+
+# ── 1b. Copy source and build the fat JAR ─────────────────────────────────────
+COPY src ./src
+
+# NOTE: We do NOT copy .env into the image — secrets are injected at runtime
+# by docker-compose via environment variables, which spring-dotenv will pick
+# up automatically (it reads system env vars before trying to read .env file).
+RUN mvn clean package -DskipTests -B --no-transfer-progress
+
+
+# ── Stage 2: Runtime ─────────────────────────────────────────────────────────
+# eclipse-temurin:17-jre-alpine is ~90MB vs the full JDK ~350MB
+FROM eclipse-temurin:17-jre-alpine
+
+WORKDIR /app
+
+# ── Security: never run as root inside a container ────────────────────────────
+RUN addgroup -S journalgroup && adduser -S journaluser -G journalgroup
+
+# Copy only the compiled JAR from the builder stage (no source, no Maven)
+COPY --from=builder /app/target/*.jar app.jar
+
+RUN chown journaluser:journalgroup app.jar
+
+USER journaluser
+
+# Port must match server.port in application-local.properties
+EXPOSE 8081
+
+# ── JVM flags explained ───────────────────────────────────────────────────────
+# -XX:+UseContainerSupport          honours Docker CPU/memory cgroup limits
+# -XX:MaxRAMPercentage=75.0         use up to 75% of container memory for heap
+# -Djava.security.egd=...           faster startup (avoids blocking on /dev/random)
+# -Dspring.profiles.active=local    activates application-local.properties
+ENTRYPOINT ["java", \
+  "-XX:+UseContainerSupport", \
+  "-XX:MaxRAMPercentage=75.0", \
+  "-Djava.security.egd=file:/dev/./urandom", \
+  "-Dspring.profiles.active=local", \
+  "-jar", "app.jar"]

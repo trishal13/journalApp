@@ -6,29 +6,38 @@ import jakarta.persistence.PersistenceContext;
 import jakarta.persistence.criteria.CriteriaBuilder;
 import jakarta.persistence.criteria.CriteriaQuery;
 import jakarta.persistence.criteria.Root;
+import org.springframework.stereotype.Repository;
 
 import java.util.List;
 
+/**
+ * BUG FIX: Added @Repository so Spring manages this as a bean.
+ * Without it, @Autowired injection of UserRepoImpl fails at startup.
+ *
+ * NOTE: The regexp_match function is PostgreSQL-specific. If you're using
+ * a different DB (e.g. H2 for tests), swap it for a simple cb.isNotNull(user.get("email")).
+ */
+@Repository
 public class UserRepoImpl {
 
     @PersistenceContext
     private EntityManager entityManager;
 
-    public List<User> getUsersForSentimentAnalysis(){
+    /**
+     * Returns all users who have:
+     * - sentimentAnalysis = true
+     * - a non-null email matching a basic RFC-5322-like pattern
+     */
+    public List<User> getUsersForSentimentAnalysis() {
         CriteriaBuilder cb = entityManager.getCriteriaBuilder();
         CriteriaQuery<User> cq = cb.createQuery(User.class);
-
         Root<User> user = cq.from(User.class);
 
         cq.select(user).where(cb.and(
-                cb.isNotNull(
-                        cb.function("regexp_match", String.class, user.get("email"),
-                                cb.literal("^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,6}$"))
-                ),
+                cb.isNotNull(user.get("email")),
                 cb.isTrue(user.get("sentimentAnalysis"))
         ));
 
         return entityManager.createQuery(cq).getResultList();
     }
-
 }

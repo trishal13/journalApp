@@ -11,51 +11,52 @@ import javax.crypto.SecretKey;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Objects;
 
 @Component
 public class JwtUtil {
 
+    /** Must be at least 32 characters. Set in application.properties. */
     @Value("${spring.jwt.secret.key}")
-    private String SECRET_KEY;
+    private String secretKey;
 
-    private SecretKey getSigningKey(){
-        return Keys.hmacShaKeyFor(SECRET_KEY.getBytes());
+    private static final long TOKEN_VALIDITY_MS = 1000L * 60 * 60; // 1 hour
+
+    // ── Public API ────────────────────────────────────────────────────────────
+
+    public String generateToken(String userName) {
+        return createToken(new HashMap<>(), userName);
     }
 
-    private boolean isTokenExpired(String token){
-        return extractExpiration(token).before(new Date());
+    public String extractUserName(String token) {
+        return extractAllClaims(token).getSubject();
     }
 
-    public String generateToken(String userName){
-        Map<String, Object> claims = new HashMap<>();
-        return createToken(claims, userName);
+    public boolean validateToken(String token, String userName) {
+        return !isTokenExpired(token);
     }
 
-    private String createToken(Map<String, Object> claims, String subject){
+    // ── Private helpers ───────────────────────────────────────────────────────
+
+    private String createToken(Map<String, Object> claims, String subject) {
         return Jwts.builder()
                 .setClaims(claims)
                 .setSubject(subject)
                 .setHeaderParam("typ", "JWT")
                 .setIssuedAt(new Date(System.currentTimeMillis()))
-                .setExpiration(new Date(System.currentTimeMillis() + (1000 * 60 * 60)))
-                .signWith(getSigningKey())
+                .setExpiration(new Date(System.currentTimeMillis() + TOKEN_VALIDITY_MS))
+                .signWith(getSigningKey(), SignatureAlgorithm.HS256)
                 .compact();
     }
 
-    public String extractUserName(String token){
-        return extractAllClaims(token).getSubject();
+    private boolean isTokenExpired(String token) {
+        return extractExpiration(token).before(new Date());
     }
 
-    private Date extractExpiration(String token){
+    private Date extractExpiration(String token) {
         return extractAllClaims(token).getExpiration();
     }
 
-    private String extractClaim(String token, String claim){
-        return extractAllClaims(token).get(claim, String.class);
-    }
-
-    private Claims extractAllClaims(String token){
+    private Claims extractAllClaims(String token) {
         return Jwts.parserBuilder()
                 .setSigningKey(getSigningKey())
                 .build()
@@ -63,8 +64,7 @@ public class JwtUtil {
                 .getBody();
     }
 
-    public boolean validateToken(String token, String userName){
-        return !isTokenExpired(token);
+    private SecretKey getSigningKey() {
+        return Keys.hmacShaKeyFor(secretKey.getBytes());
     }
-
 }

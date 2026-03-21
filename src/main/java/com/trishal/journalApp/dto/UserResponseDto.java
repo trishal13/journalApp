@@ -9,9 +9,9 @@ import java.util.List;
 import java.util.UUID;
 
 @Data
+@Builder
 @AllArgsConstructor
 @NoArgsConstructor
-@Builder
 public class UserResponseDto {
 
     private UUID userId;
@@ -20,5 +20,4 @@ public class UserResponseDto {
     private boolean sentimentAnalysis;
     private List<String> roles;
     private int journalEntryCount;
-
 }

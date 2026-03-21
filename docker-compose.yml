@@ -1,0 +1,168 @@
+version: '3.8'
+
+# =============================================================================
+#  Journal App — Full Local Dev Stack
+#  Spring Boot 3.5.5 / Java 17
+#
+#  QUICK START:
+#    1. cp .env.example .env  and fill in values
+#    2. docker-compose up -d
+#    3. Wait ~60s then: curl http://localhost:8081/public/health-check
+#
+#  INFRA ONLY (run app from IntelliJ):
+#    docker-compose up -d postgres redis zookeeper kafka kafka-ui
+#
+#  COMMANDS:
+#    Rebuild app after code change:  docker-compose up -d --build app
+#    View app logs:                  docker-compose logs -f app
+#    Stop all:                       docker-compose down
+#    Wipe all data:                  docker-compose down -v
+# =============================================================================
+
+services:
+
+  # ── PostgreSQL ─────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: journal_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: journaldb
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d journaldb"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Redis ──────────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: journal_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Zookeeper ──────────────────────────────────────────────────────────────
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.6.0
+    container_name: journal_zookeeper
+    restart: unless-stopped
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+    healthcheck:
+      test: ["CMD", "bash", "-c", "echo ruok | timeout 5 bash -c 'cat > /dev/tcp/localhost/2181' && echo imok"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+
+  # ── Kafka ──────────────────────────────────────────────────────────────────
+  kafka:
+    image: confluentinc/cp-kafka:7.6.0
+    container_name: journal_kafka
+    restart: unless-stopped
+    depends_on:
+      zookeeper:
+        condition: service_healthy
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      # Two listeners:
+      #   PLAINTEXT        — used by other Docker containers (e.g. the app)
+      #   PLAINTEXT_HOST   — used when connecting from your host machine
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    healthcheck:
+      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9092"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+
+  # ── Kafka UI (browse topics at http://localhost:8090) ──────────────────────
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: journal_kafka_ui
+    restart: unless-stopped
+    depends_on:
+      kafka:
+        condition: service_healthy
+    ports:
+      - "8090:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
+
+  # ── Spring Boot App ────────────────────────────────────────────────────────
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: journal_app
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    ports:
+      - "8081:8081"
+
+    # ── How secrets reach the app in Docker ────────────────────────────────
+    # spring-dotenv reads .env automatically when running locally with Maven.
+    # Inside Docker we do NOT copy .env into the image (security risk).
+    # Instead docker-compose reads .env from the host and passes each value
+    # as a real environment variable — Spring Boot (and spring-dotenv) will
+    # resolve ${VAR} from the process environment, which takes priority over
+    # the .env file. So the same application.properties works in both cases.
+    env_file:
+      - .env   # docker-compose reads this and injects as env vars
+
+    environment:
+      # ── Override infra URLs to use Docker service names, not localhost ──
+      # These OVERRIDE whatever is in application-local.properties / .env
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/journaldb
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      # Disable SASL for local Docker Kafka (plain text)
+      SPRING_KAFKA_PROPERTIES_SECURITY_PROTOCOL: PLAINTEXT
+      SPRING_KAFKA_PROPERTIES_SASL_MECHANISM: ""
+      SPRING_KAFKA_PROPERTIES_SASL_JAAS_CONFIG: ""
+      # Active profile
+      SPRING_PROFILES_ACTIVE: local
+
+    healthcheck:
+      # Uses /actuator/health — requires spring-boot-starter-actuator in pom.xml
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8081/actuator/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 90s   # give Spring Boot time to start before first check
+
+volumes:
+  postgres_data:
+  redis_data:

@@ -5,10 +5,12 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
 @Data
+@Builder
 @AllArgsConstructor
 @NoArgsConstructor
 public class UserRegistrationRequestDto {
@@ -25,5 +27,11 @@ public class UserRegistrationRequestDto {
     @Email(message = "Please provide a valid email address")
     private String email;
 
+    /**
+     * @Builder.Default ensures the builder sets sentimentAnalysis=false
+     * rather than the Java primitive default (also false, but this makes
+     * intent explicit and prevents surprises if the default ever changes).
+     */
+    @Builder.Default
     private boolean sentimentAnalysis = false;
 }

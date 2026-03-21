@@ -15,16 +15,16 @@ import org.springframework.web.client.RestTemplate;
 public class JournalApplication {
 
 	public static void main(String[] args) {
-
 		ConfigurableApplicationContext context = SpringApplication.run(JournalApplication.class, args);
 		ConfigurableEnvironment environment = context.getEnvironment();
-		System.out.println(environment.getActiveProfiles()[0]);
-
+		String[] activeProfiles = environment.getActiveProfiles();
+		if (activeProfiles.length > 0) {
+			System.out.println("Active profile: " + activeProfiles[0]);
+		}
 	}
 
 	@Bean
-	public RestTemplate restTemplate(){
+	public RestTemplate restTemplate() {
 		return new RestTemplate();
 	}
-
 }

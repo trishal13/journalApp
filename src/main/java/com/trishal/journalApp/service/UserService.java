@@ -1,10 +1,11 @@
 package com.trishal.journalApp.service;
 
 import com.trishal.journalApp.entity.User;
+import com.trishal.journalApp.exception.ErrorCode;
+import com.trishal.journalApp.exception.JournalAppException;
+import com.trishal.journalApp.exception.UserNotFoundException;
 import com.trishal.journalApp.repository.UserRepo;
 import lombok.extern.slf4j.Slf4j;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -12,6 +13,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -19,65 +21,75 @@ import java.util.UUID;
 @Slf4j
 public class UserService {
 
-    private static final Logger logger = LoggerFactory.getLogger(UserService.class);
-
     @Autowired
     private UserRepo userRepo;
 
     private static final PasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
-    public void saveNewUser(User user){
+    // ── Create / Update ───────────────────────────────────────────────────────
+
+    public void saveNewUser(User user) {
         try {
             user.setPassword(passwordEncoder.encode(user.getPassword()));
             user.setRoles(Arrays.asList("USER"));
             userRepo.save(user);
-        }
-        catch (Exception e){
-            logger.error("Exception: ", e); // from logger instance
-            log.error("Exception: ", e);    // from @Slf4j
-            throw new RuntimeException("An error occured!");
+        } catch (Exception e) {
+            log.error("Failed to save new user username={}", user.getUserName(), e);
+            throw new JournalAppException(ErrorCode.USER_CREATION_FAILED, e);
         }
     }
 
-    public void saveAdmin(User user){
+    public void saveAdmin(User user) {
         try {
             user.setPassword(passwordEncoder.encode(user.getPassword()));
             user.setRoles(Arrays.asList("USER", "ADMIN"));
             userRepo.save(user);
-        }
-        catch (Exception e){
-            logger.error("Exception: ", e);
-            throw new RuntimeException("An error occured!");
+        } catch (Exception e) {
+            log.error("Failed to save admin user username={}", user.getUserName(), e);
+            throw new JournalAppException(ErrorCode.USER_CREATION_FAILED, e);
         }
     }
 
-    public void saveEntry(User user){
+    /** Persist a user without re-encoding the password (used for internal updates). */
+    public void saveEntry(User user) {
         try {
             userRepo.save(user);
-        }
-        catch (Exception e){
-            logger.error("Exception: ", e);
-            throw new RuntimeException("An error occured!");
+        } catch (Exception e) {
+            log.error("Failed to save user id={}", user.getUserId(), e);
+            throw new JournalAppException(ErrorCode.USER_UPDATE_FAILED, e);
         }
     }
 
-    public List<User> getAll(){
+    // ── Read ─────────────────────────────────────────────────────────────────
+
+    public List<User> getAll() {
         return userRepo.findAll();
     }
 
-    public Optional<User> getUserById(UUID id){
+    public Optional<User> getUserById(UUID id) {
         return userRepo.findById(id);
     }
 
-    public void deleteUserById(UUID id){
+    public User findByUserName(String userName) {
+        User user = userRepo.findByUserName(userName);
+        if (Objects.isNull(user)) {
+            throw new UserNotFoundException(userName);
+        }
+        return user;
+    }
+
+    // ── Delete ────────────────────────────────────────────────────────────────
+
+    public void deleteUserById(UUID id) {
         userRepo.deleteById(id);
     }
 
-    public User findByUserName(String userName){
-        return userRepo.findByUserName(userName);
-    }
-
-    public User deleteByUserName(String userName){
-        return userRepo.deleteByUserName(userName);
+    public User deleteByUserName(String userName) {
+        try {
+            return userRepo.deleteByUserName(userName);
+        } catch (Exception e) {
+            log.error("Failed to delete user username={}", userName, e);
+            throw new JournalAppException(ErrorCode.USER_DELETION_FAILED, e);
+        }
     }
 }
