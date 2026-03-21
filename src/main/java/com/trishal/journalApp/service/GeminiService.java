@@ -6,6 +6,8 @@ import com.trishal.journalApp.enums.Sentiment;
 import com.trishal.journalApp.exception.ErrorCode;
 import com.trishal.journalApp.exception.JournalAppException;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.ObjectUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
@@ -68,15 +70,16 @@ public class GeminiService {
             ResponseEntity<GeminiResponse> response = restTemplate.exchange(
                     GEMINI_URL, HttpMethod.POST, entity, GeminiResponse.class);
 
-            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
+            if (response.getStatusCode().is2xxSuccessful() && !ObjectUtils.isEmpty(response.getBody())) {
                 String rawText = response.getBody().getFirstText();
                 return parseSentiment(rawText);
             }
 
+        } catch (JournalAppException e) {
+            throw e;
         } catch (Exception e) {
             log.error("Gemini sentiment analysis failed for text snippet '{}...': {}",
                     text.length() > 50 ? text.substring(0, 50) : text, e.getMessage(), e);
-            // We throw so the caller can decide whether to surface the error or swallow it.
             throw new JournalAppException(ErrorCode.GEMINI_SERVICE_UNAVAILABLE, e);
         }
         return null;
@@ -85,19 +88,21 @@ public class GeminiService {
     // ── helpers ──────────────────────────────────────────────────────────────
 
     private Sentiment parseSentiment(String raw) {
-        if (raw == null) return null;
+        if (StringUtils.isEmpty(raw)) {
+            throw new JournalAppException(ErrorCode.SENTIMENT_ANALYSIS_FAILED, "Gemini returned empty response");
+        }
         String cleaned = raw.trim().toUpperCase().replaceAll("[^A-Z]", "");
         try {
             return Sentiment.valueOf(cleaned);
         } catch (IllegalArgumentException e) {
             log.warn("Gemini returned unrecognised sentiment value: '{}'. Defaulting to null.", raw);
-            return null;
+            throw new JournalAppException(ErrorCode.SENTIMENT_INVALID, "value: " + raw);
         }
     }
 
     /** Strip quotes so the entry text does not break the prompt. */
     private String sanitise(String text) {
-        if (text == null) return "";
+        if (StringUtils.isEmpty(text)) return "";
         return text.replace("\"", "'").replace("\n", " ");
     }
 }

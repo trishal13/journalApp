@@ -7,6 +7,7 @@ import com.trishal.journalApp.kafka.producer.SentimentKafkaProducer;
 import com.trishal.journalApp.model.SentimentData;
 import com.trishal.journalApp.repository.impl.UserRepoImpl;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.ObjectUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -90,7 +91,7 @@ public class WeeklySentimentService {
         LocalDateTime sevenDaysAgo = LocalDateTime.now().minus(7, ChronoUnit.DAYS);
         return user.getJournalEntries()
                 .stream()
-                .filter(entry -> entry.getDate() != null &&
+                .filter(entry -> !ObjectUtils.isEmpty(entry.getDate()) &&
                         entry.getDate().toInstant()
                                 .isAfter(sevenDaysAgo.atZone(ZoneId.systemDefault()).toInstant()))
                 .collect(Collectors.toList());
@@ -98,7 +99,7 @@ public class WeeklySentimentService {
 
     private Optional<Sentiment> findDominantSentiment(List<JournalEntry> entries) {
         Map<Sentiment, Long> counts = entries.stream()
-                .filter(e -> e.getSentiment() != null)
+                .filter(e -> !ObjectUtils.isEmpty(e.getSentiment()))
                 .collect(Collectors.groupingBy(JournalEntry::getSentiment, Collectors.counting()));
 
         return counts.entrySet().stream()
@@ -111,7 +112,7 @@ public class WeeklySentimentService {
      */
     private String buildSummaryMessage(User user, List<JournalEntry> entries, Sentiment dominant) {
         Map<Sentiment, Long> counts = entries.stream()
-                .filter(e -> e.getSentiment() != null)
+                .filter(e -> !ObjectUtils.isEmpty(e.getSentiment()))
                 .collect(Collectors.groupingBy(JournalEntry::getSentiment, Collectors.counting()));
 
         StringBuilder sb = new StringBuilder();

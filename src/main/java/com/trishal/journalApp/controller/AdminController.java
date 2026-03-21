@@ -1,18 +1,18 @@
 package com.trishal.journalApp.controller;
 
 import com.trishal.journalApp.cache.AppCache;
-import com.trishal.journalApp.dto.MessageResponseDto;
+import com.trishal.journalApp.dto.ApiResponse;
 import com.trishal.journalApp.entity.User;
 import com.trishal.journalApp.service.UserService;
 import com.trishal.journalApp.service.WeeklySentimentService;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.ObjectUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.Objects;
 
 @Slf4j
 @RestController
@@ -29,46 +29,31 @@ public class AdminController {
     private WeeklySentimentService weeklySentimentService;
 
     @GetMapping("/all-users")
-    public ResponseEntity<List<User>> getAllUsers() {
+    public ResponseEntity<ApiResponse<List<User>>> getAllUsers() {
         List<User> allUsers = userService.getAll();
-        if (!Objects.isNull(allUsers) && !allUsers.isEmpty()) {
-            return new ResponseEntity<>(allUsers, HttpStatus.OK);
+        if (!ObjectUtils.isEmpty(allUsers)) {
+            return ResponseEntity.ok(ApiResponse.success(allUsers, "Users retrieved."));
         }
-        return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+        return new ResponseEntity<>(ApiResponse.error("No users found."), HttpStatus.NOT_FOUND);
     }
 
     @PostMapping("/create-admin-user")
-    public ResponseEntity<User> createAdmin(@RequestBody User user) {
+    public ResponseEntity<ApiResponse<User>> createAdmin(@RequestBody User user) {
         userService.saveAdmin(user);
-        return new ResponseEntity<>(user, HttpStatus.OK);
+        return ResponseEntity.ok(ApiResponse.success(user, "Admin user created."));
     }
 
     @GetMapping("/clear-app-cache")
-    public ResponseEntity<MessageResponseDto> clearAppCache() {
+    public ResponseEntity<ApiResponse<Void>> clearAppCache() {
         appCache.init();
-        return new ResponseEntity<>(
-                MessageResponseDto.builder()
-                        .message("App cache refreshed successfully.")
-                        .success(true)
-                        .build(),
-                HttpStatus.OK
-        );
+        return ResponseEntity.ok(ApiResponse.success("App cache refreshed successfully."));
     }
 
-    /**
-     * Force-runs the weekly sentiment cron job immediately.
-     * Only accessible by ADMIN role (enforced in SecurityConfig).
-     */
     @PostMapping("/trigger-weekly-sentiment")
-    public ResponseEntity<MessageResponseDto> triggerWeeklySentimentReport() {
+    public ResponseEntity<ApiResponse<Void>> triggerWeeklySentimentReport() {
         log.info("Admin manually triggered weekly sentiment report.");
         int processed = weeklySentimentService.runWeeklySentimentReport();
-        return new ResponseEntity<>(
-                MessageResponseDto.builder()
-                        .message("Weekly sentiment report triggered. Processed " + processed + " users.")
-                        .success(true)
-                        .build(),
-                HttpStatus.OK
-        );
+        return ResponseEntity.ok(
+                ApiResponse.success("Weekly sentiment report triggered. Processed " + processed + " users."));
     }
 }

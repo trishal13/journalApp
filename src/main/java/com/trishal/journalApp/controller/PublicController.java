@@ -1,9 +1,6 @@
 package com.trishal.journalApp.controller;
 
-import com.trishal.journalApp.dto.UserLoginRequestDto;
-import com.trishal.journalApp.dto.UserLoginResponseDto;
-import com.trishal.journalApp.dto.UserRegistrationRequestDto;
-import com.trishal.journalApp.dto.UserResponseDto;
+import com.trishal.journalApp.dto.*;
 import com.trishal.journalApp.entity.User;
 import com.trishal.journalApp.mapper.UserMapper;
 import com.trishal.journalApp.service.UserService;
@@ -40,21 +37,23 @@ public class PublicController {
     private UserMapper userMapper;
 
     @GetMapping("/health-check")
-    public ResponseEntity<String> healthCheck() {
-        return ResponseEntity.ok("OK");
+    public ResponseEntity<ApiResponse<String>> healthCheck() {
+        return ResponseEntity.ok(ApiResponse.success("OK", "Service is healthy."));
     }
 
     @PostMapping("/signup")
-    public ResponseEntity<UserResponseDto> signup(
+    public ResponseEntity<ApiResponse<UserResponseDto>> signup(
             @Valid @RequestBody UserRegistrationRequestDto newUserRequest) {
 
         User newUser = userMapper.toEntity(newUserRequest);
         userService.saveNewUser(newUser);
-        return new ResponseEntity<>(userMapper.toResponse(newUser), HttpStatus.CREATED);
+        return new ResponseEntity<>(
+                ApiResponse.success(userMapper.toResponse(newUser), "User registered successfully."),
+                HttpStatus.CREATED);
     }
 
     @PostMapping("/login")
-    public ResponseEntity<UserLoginResponseDto> login(
+    public ResponseEntity<ApiResponse<UserLoginResponseDto>> login(
             @Valid @RequestBody UserLoginRequestDto userLoginRequestDto) {
 
         authenticationManager.authenticate(
@@ -68,7 +67,7 @@ public class PublicController {
         String jwtToken = jwtUtil.generateToken(userDetails.getUsername());
         User user = userService.findByUserName(userLoginRequestDto.getUserName());
 
-        UserLoginResponseDto response = UserLoginResponseDto.builder()
+        UserLoginResponseDto loginResponse = UserLoginResponseDto.builder()
                 .token(jwtToken)
                 .tokenType("Bearer")
                 .userName(user.getUserName())
@@ -76,6 +75,6 @@ public class PublicController {
                 .expiresIn(3600)
                 .build();
 
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(ApiResponse.success(loginResponse, "Login successful."));
     }
 }

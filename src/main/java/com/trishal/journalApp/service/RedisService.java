@@ -2,11 +2,11 @@ package com.trishal.journalApp.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.ObjectUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
-import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 
 @Slf4j
@@ -26,7 +26,7 @@ public class RedisService {
     public <T> T get(String key, Class<T> entityClass) {
         try {
             Object raw = redisTemplate.opsForValue().get(key);
-            if (Objects.isNull(raw)) {
+            if (ObjectUtils.isEmpty(raw)) {
                 return null;
             }
             return objectMapper.readValue(raw.toString(), entityClass);

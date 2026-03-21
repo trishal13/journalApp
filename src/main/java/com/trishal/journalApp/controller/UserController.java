@@ -1,17 +1,18 @@
 package com.trishal.journalApp.controller;
 
 import com.trishal.journalApp.api.response.WeatherResponse;
+import com.trishal.journalApp.dto.ApiResponse;
 import com.trishal.journalApp.entity.User;
 import com.trishal.journalApp.service.UserService;
 import com.trishal.journalApp.service.WeatherService;
+import org.apache.commons.lang3.ObjectUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.Objects;
 
 @RestController
 @RequestMapping("/user")
@@ -24,39 +25,38 @@ public class UserController {
     private WeatherService weatherService;
 
     @PutMapping
-    public ResponseEntity<User> updateUser(@RequestBody User newUser) {
+    public ResponseEntity<ApiResponse<User>> updateUser(@RequestBody User newUser) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         String userName = authentication.getName();
-        User oldUser = userService.findByUserName(userName); // throws UserNotFoundException if missing
+        User oldUser = userService.findByUserName(userName);
 
-        if (newUser.getUserName() != null && !newUser.getUserName().isEmpty()) {
+        if (StringUtils.isNotEmpty(newUser.getUserName())) {
             oldUser.setUserName(newUser.getUserName());
         }
-        // BUG FIX: was setting oldUser.getPassword() (no change) instead of newUser.getPassword()
-        if (newUser.getPassword() != null && !newUser.getPassword().isEmpty()) {
+        if (StringUtils.isNotEmpty(newUser.getPassword())) {
             oldUser.setPassword(newUser.getPassword());
         }
-        userService.saveNewUser(oldUser); // re-encodes password
-        return new ResponseEntity<>(oldUser, HttpStatus.OK);
+        userService.saveNewUser(oldUser);
+        return ResponseEntity.ok(ApiResponse.success(oldUser, "User updated successfully."));
     }
 
     @DeleteMapping
-    public ResponseEntity<Void> deleteUser() {
+    public ResponseEntity<ApiResponse<Void>> deleteUser() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         String userName = authentication.getName();
         userService.deleteByUserName(userName);
-        return new ResponseEntity<>(HttpStatus.NO_CONTENT);
+        return ResponseEntity.ok(ApiResponse.success("User deleted successfully."));
     }
 
     @GetMapping
-    public ResponseEntity<String> greetings(@RequestParam String city) {
+    public ResponseEntity<ApiResponse<String>> greetings(@RequestParam String city) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         String userName = authentication.getName();
         WeatherResponse weatherResponse = weatherService.getWeather(city);
         StringBuilder message = new StringBuilder("Hi " + userName);
-        if (!Objects.isNull(weatherResponse)) {
+        if (!ObjectUtils.isEmpty(weatherResponse)) {
             message.append(", Weather feels like: ").append(weatherResponse.getCurrent().getFeelslike()).append("°C");
         }
-        return new ResponseEntity<>(message.toString(), HttpStatus.OK);
+        return ResponseEntity.ok(ApiResponse.success(message.toString(), "Greeting retrieved."));
     }
 }

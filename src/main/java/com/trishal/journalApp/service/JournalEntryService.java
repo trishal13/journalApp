@@ -9,12 +9,13 @@ import com.trishal.journalApp.exception.ErrorCode;
 import com.trishal.journalApp.exception.JournalAppException;
 import com.trishal.journalApp.repository.JournalEntryRepo;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.ObjectUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -40,7 +41,7 @@ public class JournalEntryService {
     @Transactional
     public void saveEntry(JournalEntry journalEntry, String userName) {
         User user = userService.findByUserName(userName);
-        if (Objects.isNull(user)) {
+        if (ObjectUtils.isEmpty(user)) {
             throw new UserNotFoundException(userName);
         }
 
@@ -95,7 +96,7 @@ public class JournalEntryService {
     @Transactional
     public boolean deleteJournalEntryById(UUID id, String userName) {
         User user = userService.findByUserName(userName);
-        if (Objects.isNull(user)) {
+        if (ObjectUtils.isEmpty(user)) {
             throw new UserNotFoundException(userName);
         }
 
@@ -135,8 +136,8 @@ public class JournalEntryService {
 
     private String buildTextForAnalysis(JournalEntry entry) {
         StringBuilder sb = new StringBuilder();
-        if (entry.getTitle() != null) sb.append(entry.getTitle()).append(". ");
-        if (entry.getContent() != null) sb.append(entry.getContent());
+        if (StringUtils.isNotEmpty(entry.getTitle())) sb.append(entry.getTitle()).append(". ");
+        if (StringUtils.isNotEmpty(entry.getContent())) sb.append(entry.getContent());
         return sb.toString().trim();
     }
 }

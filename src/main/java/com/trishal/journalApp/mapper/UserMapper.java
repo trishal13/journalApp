@@ -3,9 +3,8 @@ package com.trishal.journalApp.mapper;
 import com.trishal.journalApp.dto.UserRegistrationRequestDto;
 import com.trishal.journalApp.dto.UserResponseDto;
 import com.trishal.journalApp.entity.User;
+import org.apache.commons.lang3.ObjectUtils;
 import org.springframework.stereotype.Component;
-
-import java.util.Objects;
 
 @Component
 public class UserMapper {
@@ -25,8 +24,7 @@ public class UserMapper {
     }
 
     public UserResponseDto toResponse(User user) {
-        // BUG FIX: was `Objects.isNull(...)` which returned 0 when list existed
-        int entryCount = Objects.nonNull(user.getJournalEntries())
+        int entryCount = !ObjectUtils.isEmpty(user.getJournalEntries())
                 ? user.getJournalEntries().size()
                 : 0;
 

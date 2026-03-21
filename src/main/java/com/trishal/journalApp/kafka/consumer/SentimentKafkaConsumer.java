@@ -29,8 +29,8 @@ public class SentimentKafkaConsumer {
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @KafkaListener(
-            topics    = "${weekly.sentiment.topic}",   // FIX: property placeholder directly in annotation
-            groupId   = "${weekly.sentiment.group}",   // FIX: property placeholder directly in annotation
+            topics    = "${weekly.sentiment.topic}",
+            groupId   = "${weekly.sentiment.group}",
             containerFactory = "kafkaListenerContainerFactory"
     )
     public void consume(String message) {

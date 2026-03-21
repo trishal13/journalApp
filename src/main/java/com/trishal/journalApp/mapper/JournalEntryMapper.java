@@ -3,6 +3,7 @@ package com.trishal.journalApp.mapper;
 import com.trishal.journalApp.dto.JournalEntryCreateRequestDto;
 import com.trishal.journalApp.dto.JournalEntryResponseDto;
 import com.trishal.journalApp.entity.JournalEntry;
+import org.apache.commons.lang3.ObjectUtils;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -31,7 +32,7 @@ public class JournalEntryMapper {
                 .content(journalEntry.getContent())
                 .date(journalEntry.getDate())
                 .sentiment(journalEntry.getSentiment())
-                .authorUserName(journalEntry.getUser() != null
+                .authorUserName(!ObjectUtils.isEmpty(journalEntry.getUser())
                         ? journalEntry.getUser().getUserName()
                         : null)
                 .build();

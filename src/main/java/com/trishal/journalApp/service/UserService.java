@@ -6,6 +6,7 @@ import com.trishal.journalApp.exception.JournalAppException;
 import com.trishal.journalApp.exception.UserNotFoundException;
 import com.trishal.journalApp.repository.UserRepo;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.ObjectUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -13,7 +14,6 @@ import org.springframework.stereotype.Service;
 
 import java.util.Arrays;
 import java.util.List;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -29,6 +29,9 @@ public class UserService {
     // ── Create / Update ───────────────────────────────────────────────────────
 
     public void saveNewUser(User user) {
+        if (userRepo.existsByUserName(user.getUserName())) {
+            throw new JournalAppException(ErrorCode.USER_ALREADY_EXISTS, "username: " + user.getUserName());
+        }
         try {
             user.setPassword(passwordEncoder.encode(user.getPassword()));
             user.setRoles(Arrays.asList("USER"));
@@ -40,6 +43,9 @@ public class UserService {
     }
 
     public void saveAdmin(User user) {
+        if (userRepo.existsByUserName(user.getUserName())) {
+            throw new JournalAppException(ErrorCode.USER_ALREADY_EXISTS, "username: " + user.getUserName());
+        }
         try {
             user.setPassword(passwordEncoder.encode(user.getPassword()));
             user.setRoles(Arrays.asList("USER", "ADMIN"));
@@ -72,7 +78,7 @@ public class UserService {
 
     public User findByUserName(String userName) {
         User user = userRepo.findByUserName(userName);
-        if (Objects.isNull(user)) {
+        if (ObjectUtils.isEmpty(user)) {
             throw new UserNotFoundException(userName);
         }
         return user;

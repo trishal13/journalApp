@@ -1,11 +1,14 @@
 package com.trishal.journalApp.filter;
 
 import com.trishal.journalApp.utils.JwtUtil;
+import io.jsonwebtoken.ExpiredJwtException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.ObjectUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -42,12 +45,14 @@ public class JwtFilter extends OncePerRequestFilter {
             jwtToken = authHeader.substring(7);
             try {
                 userName = jwtUtil.extractUserName(jwtToken);
+            } catch (ExpiredJwtException e) {
+                log.warn("JWT expired for request [{}]: {}", request.getRequestURI(), e.getMessage());
             } catch (Exception e) {
-                log.warn("JWT extraction failed for request [{}]: {}", request.getRequestURI(), e.getMessage());
+                log.warn("JWT invalid for request [{}]: {}", request.getRequestURI(), e.getMessage());
             }
         }
 
-        if (userName != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+        if (StringUtils.isNotEmpty(userName) && ObjectUtils.isEmpty(SecurityContextHolder.getContext().getAuthentication())) {
             UserDetails userDetails = userDetailsService.loadUserByUsername(userName);
             if (jwtUtil.validateToken(jwtToken, userDetails.getUsername())) {
                 UsernamePasswordAuthenticationToken auth =

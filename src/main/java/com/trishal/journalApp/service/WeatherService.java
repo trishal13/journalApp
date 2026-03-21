@@ -6,14 +6,13 @@ import com.trishal.journalApp.constants.Placeholders;
 import com.trishal.journalApp.exception.ErrorCode;
 import com.trishal.journalApp.exception.JournalAppException;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.ObjectUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
-
-import java.util.Objects;
 
 @Slf4j
 @Service
@@ -45,7 +44,7 @@ public class WeatherService {
 
         // 1. Try cache
         WeatherResponse cached = redisService.get(cacheKey, WeatherResponse.class);
-        if (!Objects.isNull(cached)) {
+        if (!ObjectUtils.isEmpty(cached)) {
             log.debug("Weather cache HIT for city={}", city);
             return cached;
         }
@@ -61,7 +60,7 @@ public class WeatherService {
                     restTemplate.exchange(apiUrl, HttpMethod.GET, null, WeatherResponse.class);
 
             WeatherResponse body = responseEntity.getBody();
-            if (!Objects.isNull(body)) {
+            if (!ObjectUtils.isEmpty(body)) {
                 redisService.set(cacheKey, body, CACHE_TTL_SECONDS);
                 log.debug("Weather cache SET for city={}", city);
             }

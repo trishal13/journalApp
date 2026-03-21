@@ -1,16 +1,17 @@
 package com.trishal.journalApp.exception;
 
+import com.trishal.journalApp.dto.ApiResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
-import java.time.Instant;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -18,100 +19,98 @@ import java.util.stream.Collectors;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    // ── Our own domain exceptions ────────────────────────────────────────────
-
     @ExceptionHandler(JournalAppException.class)
-    public ResponseEntity<ErrorResponse> handleJournalAppException(
+    public ResponseEntity<ApiResponse<Void>> handleJournalAppException(
             JournalAppException ex, HttpServletRequest request) {
 
         log.warn("JournalAppException [{}]: {}", ex.getErrorCode().getCode(), ex.getMessage());
 
-        ErrorResponse body = ErrorResponse.builder()
-                .errorCode(ex.getErrorCode().getCode())
+        ApiResponse.ApiError error = ApiResponse.ApiError.builder()
+                .code(ex.getErrorCode().getCode())
                 .message(ex.getMessage())
-                .status(ex.getErrorCode().getHttpStatus().value())
-                .path(request.getRequestURI())
-                .timestamp(Instant.now())
                 .build();
 
-        return new ResponseEntity<>(body, ex.getErrorCode().getHttpStatus());
+        return new ResponseEntity<>(
+                ApiResponse.error(ex.getErrorCode().getMessage(), List.of(error)),
+                ex.getErrorCode().getHttpStatus());
     }
 
-    // ── Bean Validation (@Valid) ──────────────────────────────────────────────
-
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<ErrorResponse> handleValidation(
+    public ResponseEntity<ApiResponse<Void>> handleValidation(
             MethodArgumentNotValidException ex, HttpServletRequest request) {
 
-        List<ErrorResponse.FieldError> fieldErrors = ex.getBindingResult()
+        List<ApiResponse.ApiError> fieldErrors = ex.getBindingResult()
                 .getFieldErrors()
                 .stream()
-                .map(fe -> ErrorResponse.FieldError.builder()
+                .map(fe -> ApiResponse.ApiError.builder()
+                        .code(ErrorCode.VALIDATION_FAILED.getCode())
                         .field(fe.getField())
                         .message(fe.getDefaultMessage())
                         .build())
                 .collect(Collectors.toList());
 
-        ErrorResponse body = ErrorResponse.builder()
-                .errorCode(ErrorCode.VALIDATION_FAILED.getCode())
-                .message(ErrorCode.VALIDATION_FAILED.getMessage())
-                .status(HttpStatus.BAD_REQUEST.value())
-                .path(request.getRequestURI())
-                .timestamp(Instant.now())
-                .fieldErrors(fieldErrors)
-                .build();
-
-        return new ResponseEntity<>(body, HttpStatus.BAD_REQUEST);
+        return new ResponseEntity<>(
+                ApiResponse.error(ErrorCode.VALIDATION_FAILED.getMessage(), fieldErrors),
+                HttpStatus.BAD_REQUEST);
     }
 
-    // ── Spring Security ───────────────────────────────────────────────────────
-
     @ExceptionHandler(AccessDeniedException.class)
-    public ResponseEntity<ErrorResponse> handleAccessDenied(
+    public ResponseEntity<ApiResponse<Void>> handleAccessDenied(
             AccessDeniedException ex, HttpServletRequest request) {
 
-        ErrorResponse body = ErrorResponse.builder()
-                .errorCode(ErrorCode.ACCESS_DENIED.getCode())
+        ApiResponse.ApiError error = ApiResponse.ApiError.builder()
+                .code(ErrorCode.ACCESS_DENIED.getCode())
                 .message(ErrorCode.ACCESS_DENIED.getMessage())
-                .status(HttpStatus.FORBIDDEN.value())
-                .path(request.getRequestURI())
-                .timestamp(Instant.now())
                 .build();
 
-        return new ResponseEntity<>(body, HttpStatus.FORBIDDEN);
+        return new ResponseEntity<>(
+                ApiResponse.error(ErrorCode.ACCESS_DENIED.getMessage(), List.of(error)),
+                HttpStatus.FORBIDDEN);
     }
 
     @ExceptionHandler(AuthenticationException.class)
-    public ResponseEntity<ErrorResponse> handleAuthentication(
+    public ResponseEntity<ApiResponse<Void>> handleAuthentication(
             AuthenticationException ex, HttpServletRequest request) {
 
-        ErrorResponse body = ErrorResponse.builder()
-                .errorCode(ErrorCode.USER_INVALID_CREDENTIALS.getCode())
+        ApiResponse.ApiError error = ApiResponse.ApiError.builder()
+                .code(ErrorCode.USER_INVALID_CREDENTIALS.getCode())
                 .message(ErrorCode.USER_INVALID_CREDENTIALS.getMessage())
-                .status(HttpStatus.UNAUTHORIZED.value())
-                .path(request.getRequestURI())
-                .timestamp(Instant.now())
                 .build();
 
-        return new ResponseEntity<>(body, HttpStatus.UNAUTHORIZED);
+        return new ResponseEntity<>(
+                ApiResponse.error(ErrorCode.USER_INVALID_CREDENTIALS.getMessage(), List.of(error)),
+                HttpStatus.UNAUTHORIZED);
     }
 
-    // ── Catch-all ────────────────────────────────────────────────────────────
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ApiResponse<Void>> handleMessageNotReadable(
+            HttpMessageNotReadableException ex, HttpServletRequest request) {
+
+        log.warn("Malformed request body at {}: {}", request.getRequestURI(), ex.getMessage());
+
+        ApiResponse.ApiError error = ApiResponse.ApiError.builder()
+                .code(ErrorCode.INVALID_REQUEST_BODY.getCode())
+                .message(ErrorCode.INVALID_REQUEST_BODY.getMessage())
+                .build();
+
+        return new ResponseEntity<>(
+                ApiResponse.error(ErrorCode.INVALID_REQUEST_BODY.getMessage(), List.of(error)),
+                HttpStatus.BAD_REQUEST);
+    }
 
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<ErrorResponse> handleGeneric(
+    public ResponseEntity<ApiResponse<Void>> handleGeneric(
             Exception ex, HttpServletRequest request) {
 
         log.error("Unhandled exception at {}: ", request.getRequestURI(), ex);
 
-        ErrorResponse body = ErrorResponse.builder()
-                .errorCode(ErrorCode.INTERNAL_SERVER_ERROR.getCode())
+        ApiResponse.ApiError error = ApiResponse.ApiError.builder()
+                .code(ErrorCode.INTERNAL_SERVER_ERROR.getCode())
                 .message(ErrorCode.INTERNAL_SERVER_ERROR.getMessage())
-                .status(HttpStatus.INTERNAL_SERVER_ERROR.value())
-                .path(request.getRequestURI())
-                .timestamp(Instant.now())
                 .build();
 
-        return new ResponseEntity<>(body, HttpStatus.INTERNAL_SERVER_ERROR);
+        return new ResponseEntity<>(
+                ApiResponse.error(ErrorCode.INTERNAL_SERVER_ERROR.getMessage(), List.of(error)),
+                HttpStatus.INTERNAL_SERVER_ERROR);
     }
 }

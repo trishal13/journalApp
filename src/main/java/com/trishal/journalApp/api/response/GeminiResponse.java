@@ -2,6 +2,7 @@ package com.trishal.journalApp.api.response;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import lombok.Data;
+import org.apache.commons.lang3.ObjectUtils;
 
 import java.util.List;
 
@@ -36,11 +37,10 @@ public class GeminiResponse {
      * Convenience method: returns the raw text from the first candidate/part.
      */
     public String getFirstText() {
-        if (candidates != null && !candidates.isEmpty()) {
+        if (!ObjectUtils.isEmpty(candidates)) {
             Candidate candidate = candidates.get(0);
-            if (candidate.getContent() != null
-                    && candidate.getContent().getParts() != null
-                    && !candidate.getContent().getParts().isEmpty()) {
+            if (!ObjectUtils.isEmpty(candidate.getContent())
+                    && !ObjectUtils.isEmpty(candidate.getContent().getParts())) {
                 return candidate.getContent().getParts().get(0).getText();
             }
         }

@@ -5,6 +5,7 @@ import com.trishal.journalApp.exception.ErrorCode;
 import com.trishal.journalApp.exception.JournalAppException;
 import com.trishal.journalApp.model.SentimentData;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.ObjectUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.core.KafkaTemplate;
@@ -48,7 +49,7 @@ public class SentimentKafkaProducer {
                     kafkaTemplate.send(weeklySentimentTopic, sentimentData.getEmail(), payload);
 
             future.whenComplete((result, ex) -> {
-                if (ex != null) {
+                if (!ObjectUtils.isEmpty(ex)) {
                     log.error("Failed to deliver weekly-sentiment for email={}: {}",
                             sentimentData.getEmail(), ex.getMessage(), ex);
                 } else {
