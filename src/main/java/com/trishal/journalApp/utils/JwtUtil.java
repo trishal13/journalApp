@@ -31,8 +31,18 @@ public class JwtUtil {
         return extractAllClaims(token).getSubject();
     }
 
+    /**
+     * BUG FIX: Previously only checked token expiry, ignoring whether the token's
+     * subject matches the supplied userName. This meant a valid (non-expired) token
+     * issued for user A would pass validation when presented as user B.
+     *
+     * Fix: the token is valid only if BOTH conditions hold —
+     *   1. The subject claim matches the expected userName (case-sensitive).
+     *   2. The token has not expired.
+     */
     public boolean validateToken(String token, String userName) {
-        return !isTokenExpired(token);
+        final String tokenUserName = extractUserName(token);
+        return tokenUserName.equals(userName) && !isTokenExpired(token);
     }
 
     // ── Private helpers ───────────────────────────────────────────────────────

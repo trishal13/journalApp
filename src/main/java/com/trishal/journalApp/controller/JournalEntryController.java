@@ -96,7 +96,7 @@ public class JournalEntryController {
         if (StringUtils.isNotBlank(dto.getContent())) {
             existing.setContent(dto.getContent());
         }
-        journalEntryService.saveEntry(existing);
+        journalEntryService.saveEntry(existing, user);
 
         return ResponseEntity.ok(
                 ApiResponse.success(journalEntryMapper.toResponse(existing), "Journal entry updated."));

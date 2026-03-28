@@ -44,10 +44,12 @@ public class JournalEntryService {
         if (ObjectUtils.isEmpty(user)) {
             throw new UserNotFoundException(userName);
         }
-
-        // Auto-analyse sentiment via Gemini
-        Sentiment detectedSentiment = analyseSentimentSafely(journalEntry);
-        journalEntry.setSentiment(detectedSentiment);
+        Sentiment detectedSentiment = null;
+        if (ObjectUtils.isEmpty(journalEntry.getSentiment()) && user.isSentimentAnalysis()){
+            // Auto-analyse sentiment via Gemini
+            detectedSentiment = analyseSentimentSafely(journalEntry);
+            journalEntry.setSentiment(detectedSentiment);
+        }
         journalEntry.setUser(user);
 
         try {
@@ -67,12 +69,14 @@ public class JournalEntryService {
      * Re-analyses sentiment whenever title or content may have changed.
      */
     @Transactional
-    public void saveEntry(JournalEntry journalEntry) {
-        // Re-run sentiment analysis on update
-        Sentiment detectedSentiment = analyseSentimentSafely(journalEntry);
-        journalEntry.setSentiment(detectedSentiment);
-
+    public void saveEntry(JournalEntry journalEntry, User user) {
         try {
+            Sentiment detectedSentiment = null;
+            if (user.isSentimentAnalysis()){
+                // Re-run sentiment analysis on update
+                detectedSentiment = analyseSentimentSafely(journalEntry);
+                journalEntry.setSentiment(detectedSentiment);
+            }
             journalEntryRepo.save(journalEntry);
             log.info("Updated journal entry id={} with sentiment={}", journalEntry.getId(), detectedSentiment);
         } catch (Exception e) {

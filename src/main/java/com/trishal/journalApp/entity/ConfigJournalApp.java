@@ -1,5 +1,6 @@
 package com.trishal.journalApp.entity;
 
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.Id;
@@ -23,6 +24,15 @@ public class ConfigJournalApp {
     @GeneratedValue
     private UUID id;
 
+    /**
+     * KEY is a reserved word in SQL. Quoting it prevents issues with
+     * databases that reject unquoted reserved words in DDL/DML.
+     * The column name in PostgreSQL stays "key" — the quotes are only
+     * for the SQL generation layer.
+     */
+    @Column(name = "\"key\"", nullable = false, unique = true)
     private String key;
+
+    @Column(name = "value")
     private String value;
 }

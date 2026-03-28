@@ -15,5 +15,5 @@ public interface UserRepo extends JpaRepository<User, UUID> {
     boolean existsByUserName(String userName);
 
     @Transactional
-    User deleteByUserName(String userName);
+    void deleteByUserName(String userName);
 }

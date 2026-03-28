@@ -4,4 +4,6 @@ public interface Placeholders {
 
     String API_KEY = "<apiKey>";
     String CITY = "<city>";
+    String LAT = "<lat>";
+    String LON = "<lon>";
 }
