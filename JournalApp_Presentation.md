@@ -598,7 +598,7 @@ Also triggerable manually: **POST /admin/trigger-weekly-sentiment** (ADMIN only)
 
 ---
 
-## Slide 18: Flow 9 — Admin Endpoints
+## Slide 18: Flow 9 — Admin Endpoints Overview
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
@@ -615,7 +615,250 @@ All admin endpoints require JWT with ADMIN role. Regular users get 403 Forbidden
 
 ---
 
-## Slide 19: Error Handling Architecture
+## Slide 19: Flow 10 — Trigger Weekly Sentiment (Admin)
+
+```mermaid
+sequenceDiagram
+    actor Admin
+    participant Ctrl as AdminController
+    participant Svc as WeeklySentimentService
+    participant Repo as UserRepoImpl
+    participant DB as PostgreSQL
+    participant Producer as SentimentKafkaProducer
+    participant Kafka as Kafka Topic
+    participant Consumer as SentimentKafkaConsumer
+    participant Email as EmailService
+    participant SMTP as Gmail SMTP
+
+    Admin->>Ctrl: POST /admin/trigger-weekly-sentiment<br/>(Bearer admin-token)
+    Ctrl->>Svc: runWeeklySentimentReport()
+
+    Svc->>Repo: getUsersForSentimentAnalysis()
+    Repo->>DB: SELECT * FROM users<br/>WHERE email IS NOT NULL<br/>AND sentimentAnalysis = true
+    DB-->>Repo: [user1, user2, user3]
+    Repo-->>Svc: eligible users list
+
+    loop For each eligible user
+        Svc->>Svc: getEntriesFromLastSevenDays(user)<br/>Filter: entry.date > (now - 7 days)
+
+        alt No entries in last 7 days
+            Svc->>Svc: Skip user (log debug)
+        else Has entries
+            Svc->>Svc: findDominantSentiment(entries)<br/>Group by sentiment → find max count
+            Svc->>Svc: buildSummaryMessage()<br/>"Hi user, Total: 5, Dominant: HAPPY..."
+
+            alt Kafka available
+                Svc->>Producer: sendWeeklySentiment({email, summary})
+                Producer->>Producer: Serialize to JSON
+                Producer->>Kafka: send(topic, email_key, payload)
+                Note over Kafka,SMTP: Async consumption
+                Kafka->>Consumer: consume(message)
+                Consumer->>Consumer: Deserialize JSON → SentimentData
+                Consumer->>Email: sendEmail(to, subject, body)
+                Email->>SMTP: SimpleMailMessage
+                SMTP-->>Email: sent
+            else Kafka unavailable
+                Svc->>Email: sendEmail(to, subject, body)<br/>(direct fallback)
+                Email->>SMTP: SimpleMailMessage
+                SMTP-->>Email: sent
+            end
+        end
+
+        alt User processing fails (NPE, etc.)
+            Svc->>Svc: Log error, continue to next user<br/>(one bad user does NOT abort batch)
+        end
+    end
+
+    Svc-->>Ctrl: processed count (e.g. 3)
+    Ctrl-->>Admin: 200 OK
+```
+
+Response `200 OK`:
+```json
+{
+    "success": true,
+    "message": "Weekly sentiment report triggered. Processed 3 users."
+}
+```
+
+Email sent to each user:
+```
+Hi johndoe,
+
+Here is your weekly journal sentiment summary:
+
+  • Total entries this week: 5
+  • Dominant mood: HAPPY
+
+Mood breakdown:
+  • HAPPY: 3 entries
+  • SAD: 1 entries
+  • ANXIOUS: 1 entries
+
+Keep journaling — see you next week!
+```
+
+---
+
+## Slide 20: Flow 11 — Clear App Cache (Admin)
+
+```mermaid
+sequenceDiagram
+    actor Admin
+    participant Ctrl as AdminController
+    participant Cache as AppCache
+    participant Repo as ConfigJournalAppRepo
+    participant DB as PostgreSQL
+
+    Admin->>Ctrl: GET /admin/clear-app-cache<br/>(Bearer admin-token)
+    Ctrl->>Cache: init()
+
+    Cache->>Cache: appCache = new HashMap<>()
+    Cache->>Repo: findAll()
+    Repo->>DB: SELECT * FROM config_journal_app
+    DB-->>Repo: [WEATHER_API → url, GEMINI_API → url]
+    Repo-->>Cache: List of ConfigJournalApp
+
+    loop Each config entry
+        Cache->>Cache: appCache.put(key, value)
+    end
+
+    Cache-->>Ctrl: done (cache refreshed)
+    Ctrl-->>Admin: 200 OK
+```
+
+Response `200 OK`:
+```json
+{
+    "success": true,
+    "message": "App cache refreshed successfully."
+}
+```
+
+What gets refreshed:
+| Cache Key | Used By | Purpose |
+|-----------|---------|---------|
+| WEATHER_API | WeatherService | OpenWeatherMap URL template with placeholders |
+| GEMINI_API | GeminiService | Gemini AI generateContent endpoint URL |
+
+After this call, WeatherService and GeminiService immediately use the updated URLs from the refreshed cache.
+
+---
+
+## Slide 21: Flow 12 — Cron Jobs (Background Schedulers)
+
+```mermaid
+graph TB
+    subgraph Scheduler["UserScheduler (Spring @Scheduled)"]
+        Cron1["Weekly Sentiment Report<br/>Cron: 0 0 9 * * SUN<br/>(Every Sunday at 9:00 AM)"]
+        Cron2["App Cache Refresh<br/>Cron: 0 0/10 * ? * *<br/>(Every 10 minutes)"]
+    end
+
+    subgraph Job1Flow["Weekly Sentiment Report Flow"]
+        J1A["Load users with<br/>sentimentAnalysis=true<br/>+ valid email"]
+        J1B["For each user:<br/>get entries from last 7 days"]
+        J1C["Find dominant sentiment<br/>(HAPPY/SAD/ANGRY/ANXIOUS)"]
+        J1D["Build summary email"]
+        J1E{"Kafka available?"}
+        J1F["Publish to Kafka topic"]
+        J1G["Consumer reads → sends email"]
+        J1H["Direct email (fallback)"]
+    end
+
+    subgraph Job2Flow["App Cache Refresh Flow"]
+        J2A["Clear in-memory HashMap"]
+        J2B["SELECT * FROM config_journal_app"]
+        J2C["Reload all key-value pairs<br/>into AppCache.appCache"]
+    end
+
+    Cron1 --> J1A --> J1B --> J1C --> J1D --> J1E
+    J1E --> |"Yes"| J1F --> J1G
+    J1E --> |"No"| J1H
+
+    Cron2 --> J2A --> J2B --> J2C
+
+    style Scheduler fill:#fff3cd,stroke:#ffc107
+    style Job1Flow fill:#d1ecf1,stroke:#17a2b8
+    style Job2Flow fill:#d4edda,stroke:#28a745
+```
+
+**Cron Job 1: Weekly Sentiment Report**
+
+| Property | Value |
+|----------|-------|
+| Schedule | Every Sunday at 9:00 AM |
+| Cron Expression | `0 0 9 * * SUN` |
+| Method | `UserScheduler.fetchUsersAndSendSAMail()` |
+| Delegates to | `WeeklySentimentService.runWeeklySentimentReport()` |
+| Manual trigger | `POST /admin/trigger-weekly-sentiment` |
+
+Detailed sequence:
+```mermaid
+sequenceDiagram
+    participant Cron as @Scheduled (Sunday 9AM)
+    participant Svc as WeeklySentimentService
+    participant DB as PostgreSQL
+    participant Kafka as Kafka
+    participant Email as EmailService
+
+    Note over Cron: Spring triggers automatically
+    Cron->>Svc: runWeeklySentimentReport()
+    Svc->>DB: getUsersForSentimentAnalysis()<br/>WHERE sentimentAnalysis=true AND email IS NOT NULL
+    DB-->>Svc: [user1, user2]
+
+    loop Each user
+        Svc->>Svc: Filter entries where date > (now - 7 days)
+        Svc->>Svc: Group by sentiment → find max
+        Svc->>Svc: Build "Hi user, dominant mood: X" message
+
+        alt Kafka up
+            Svc->>Kafka: publish({email, summary})
+            Note right of Kafka: Consumer picks up async<br/>→ sends email via SMTP
+        else Kafka down
+            Svc->>Email: sendEmail() directly
+        end
+    end
+
+    Svc-->>Cron: processed count
+    Note over Cron: Logs result, no HTTP response
+```
+
+**Cron Job 2: App Cache Refresh**
+
+| Property | Value |
+|----------|-------|
+| Schedule | Every 10 minutes |
+| Cron Expression | `0 0/10 * ? * *` |
+| Method | `UserScheduler.clearAppCache()` |
+| Delegates to | `AppCache.init()` |
+| Manual trigger | `GET /admin/clear-app-cache` |
+
+Detailed sequence:
+```mermaid
+sequenceDiagram
+    participant Cron as @Scheduled (every 10 min)
+    participant Cache as AppCache
+    participant DB as PostgreSQL
+
+    Note over Cron: Spring triggers automatically
+    Cron->>Cache: init()
+    Cache->>Cache: appCache = new HashMap<>()
+    Cache->>DB: SELECT * FROM config_journal_app
+    DB-->>Cache: [{key: WEATHER_API, value: url}, {key: GEMINI_API, value: url}]
+    Cache->>Cache: Put all entries into HashMap
+    Note over Cache: WeatherService & GeminiService<br/>now use updated URLs
+```
+
+Why this matters:
+- Config values (API URLs) are stored in the database
+- Services read from the in-memory cache (not DB) for performance
+- The 10-minute refresh ensures config changes propagate automatically
+- Admin can force immediate refresh via `/admin/clear-app-cache`
+- `PUT /admin/configs/{key}` also triggers immediate refresh after update
+
+---
+
+## Slide 22: Error Handling Architecture
 
 ```mermaid
 graph TD
@@ -648,7 +891,7 @@ Error Code Ranges:
 
 ---
 
-## Slide 20: API Endpoint Summary
+## Slide 23: API Endpoint Summary
 
 | Auth | Method | Endpoint | Purpose |
 |------|--------|----------|---------|
@@ -674,13 +917,13 @@ Error Code Ranges:
 
 ---
 
-## Slide 21: UI Screenshots
+## Slide 24: UI Screenshots
 
 [Placeholder — attach screenshots here]
 
 ---
 
-## Slide 22: Points for Improvement
+## Slide 25: Points for Improvement
 
 **Security**
 - Rate limiting on login/signup to prevent brute force attacks
@@ -716,7 +959,7 @@ Error Code Ranges:
 
 ---
 
-## Slide 23: Thank You
+## Slide 26: Thank You
 
 Questions?
 
