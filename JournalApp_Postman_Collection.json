@@ -248,11 +248,12 @@
 							{ "key": "Authorization", "value": "Bearer {{jwt_token}}" }
 						],
 						"url": {
-							"raw": "{{base_url}}/user?city=Mumbai",
+							"raw": "{{base_url}}/user?lat=28.6139&lon=77.2090",
 							"host": ["{{base_url}}"],
 							"path": ["user"],
 							"query": [
-								{ "key": "city", "value": "Mumbai" }
+								{ "key": "lat", "value": "28.6139" },
+								{ "key": "lon", "value": "77.2090" }
 							]
 						}
 					}
@@ -267,7 +268,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"userName\": \"johndoe_updated\",\n  \"password\": \"newpassword123\"\n}"
+							"raw": "{\n  \"userName\": \"johndoe_updated\",\n  \"password\": \"newpassword123\",\n  \"email\": \"updated@example.com\",\n  \"sentimentAnalysis\": true\n}"
 						},
 						"url": {
 							"raw": "{{base_url}}/user",
@@ -386,6 +387,72 @@
 							"raw": "{{base_url}}/admin/trigger-weekly-sentiment",
 							"host": ["{{base_url}}"],
 							"path": ["admin", "trigger-weekly-sentiment"]
+						}
+					}
+				},
+				{
+					"name": "4.6 Get All Configs",
+					"request": {
+						"method": "GET",
+						"header": [
+							{ "key": "Authorization", "value": "Bearer {{jwt_token}}" }
+						],
+						"url": {
+							"raw": "{{base_url}}/admin/configs",
+							"host": ["{{base_url}}"],
+							"path": ["admin", "configs"]
+						}
+					}
+				},
+				{
+					"name": "4.7 Update Config by Key",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" },
+							{ "key": "Authorization", "value": "Bearer {{jwt_token}}" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"value\": \"https://api.openweathermap.org/data/2.5/weather?lat=<lat>&lon=<lon>&appid=<apiKey>\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/admin/configs/WEATHER_API",
+							"host": ["{{base_url}}"],
+							"path": ["admin", "configs", "WEATHER_API"]
+						}
+					}
+				},
+				{
+					"name": "4.8 Update User by Username (Admin)",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" },
+							{ "key": "Authorization", "value": "Bearer {{jwt_token}}" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"newemail@example.com\",\n  \"sentimentAnalysis\": true\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/admin/users/johndoe",
+							"host": ["{{base_url}}"],
+							"path": ["admin", "users", "johndoe"]
+						}
+					}
+				},
+				{
+					"name": "4.9 Get User Journals (Admin)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{ "key": "Authorization", "value": "Bearer {{jwt_token}}" }
+						],
+						"url": {
+							"raw": "{{base_url}}/admin/users/johndoe/journals",
+							"host": ["{{base_url}}"],
+							"path": ["admin", "users", "johndoe", "journals"]
 						}
 					}
 				}

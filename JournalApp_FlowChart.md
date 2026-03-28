@@ -175,25 +175,25 @@ sequenceDiagram
     participant Cache as Redis
     participant API as Weather API
 
-    User->>Ctrl: GET /user?city=Mumbai
-    Ctrl->>WeatherSvc: getWeather("Mumbai")
+    User->>Ctrl: GET /user?lat=28.6&lon=77.2
+    Ctrl->>WeatherSvc: getWeather(28.6, 77.2)
 
     Note over WeatherSvc,Cache: Check cache first
-    WeatherSvc->>Redis: get("weather_of_mumbai")
-    Redis->>Cache: GET weather_of_mumbai
+    WeatherSvc->>Redis: get("weather_of_28.6_77.2")
+    Redis->>Cache: GET weather_of_28.6_77.2
     Cache-->>Redis: null (cache miss)
     Redis-->>WeatherSvc: null
 
     Note over WeatherSvc,API: Cache miss → call external API
-    WeatherSvc->>API: GET weather?city=Mumbai
-    API-->>WeatherSvc: { current: { feelslike: 32 } }
+    WeatherSvc->>API: GET weather?lat=28.6&lon=77.2
+    API-->>WeatherSvc: { main: { feels_like: 305.15 } }
 
     Note over WeatherSvc,Cache: Cache the result (5 min TTL)
-    WeatherSvc->>Redis: set("weather_of_mumbai", response, 300)
-    Redis->>Cache: SET weather_of_mumbai (TTL 300s)
+    WeatherSvc->>Redis: set("weather_of_28.6_77.2", response, 300)
+    Redis->>Cache: SET weather_of_28.6_77.2 (TTL 300s)
 
     WeatherSvc-->>Ctrl: WeatherResponse
-    Ctrl-->>User: 200 OK<br/>{ data: "Hi johndoe, Weather feels like: 32°C" }
+    Ctrl-->>User: 200 OK<br/>{ data: "Hi johndoe, Weather: clear sky, Feels like: 32°C" }
 ```
 
 ## 5. Weekly Sentiment Report Flow
@@ -272,7 +272,7 @@ graph LR
         JGet["GET /journal/id/{id}"]
         JUpdate["PUT /journal/id/{id}"]
         JDelete["DELETE /journal/id/{id}"]
-        UGreet["GET /user?city=X"]
+        UGreet["GET /user?lat=X&lon=Y"]
         UUpdate["PUT /user"]
         UDelete["DELETE /user"]
     end
@@ -282,6 +282,10 @@ graph LR
         ACreate["POST /admin/create-admin-user"]
         ACache["GET /admin/clear-app-cache"]
         ASentiment["POST /admin/trigger-weekly-sentiment"]
+        AConfigs["GET /admin/configs"]
+        AConfigUpdate["PUT /admin/configs/{key}"]
+        AUserUpdate["PUT /admin/users/{username}"]
+        AUserJournals["GET /admin/users/{username}/journals"]
     end
 
     style Public fill:#d4edda,stroke:#28a745

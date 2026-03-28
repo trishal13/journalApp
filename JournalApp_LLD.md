@@ -119,10 +119,11 @@ classDiagram
         -PasswordEncoder passwordEncoder
         +saveNewUser(User) void
         +saveAdmin(User) void
+        +updateUser(User, UserUpdateRequestDto) User
         +saveEntry(User) void
         +findByUserName(String) User
         +getAll() List~User~
-        +deleteByUserName(String) User
+        +deleteByUserName(String) void
     }
 
     class JournalEntryService {
@@ -130,7 +131,7 @@ classDiagram
         -UserService userService
         -GeminiService geminiService
         +saveEntry(JournalEntry, String) void
-        +saveEntry(JournalEntry) void
+        +saveEntry(JournalEntry, User) void
         +getJournalEntryById(UUID) Optional~JournalEntry~
         +deleteJournalEntryById(UUID, String) boolean
         -analyseSentimentSafely(JournalEntry) Sentiment
@@ -150,7 +151,7 @@ classDiagram
         -AppCache appCache
         -RedisService redisService
         -String apiKey
-        +getWeather(String) WeatherResponse
+        +getWeather(double lat, double lon) WeatherResponse
     }
 
     class WeeklySentimentService {
@@ -457,11 +458,11 @@ sequenceDiagram
     participant AppCache as AppCache
     participant API as Weatherstack API
 
-    Client->>Ctrl: GET /user?city=Mumbai
-    Ctrl->>Svc: getWeather("Mumbai")
+    Client->>Ctrl: GET /user?lat=28.6&lon=77.2
+    Ctrl->>Svc: getWeather(28.6, 77.2)
 
-    Svc->>Redis: get("weather_of_mumbai", WeatherResponse.class)
-    Redis->>Cache: GET weather_of_mumbai
+    Svc->>Redis: get("weather_of_28.6_77.2", WeatherResponse.class)
+    Redis->>Cache: GET weather_of_28.6_77.2
     
     alt Cache HIT
         Cache-->>Redis: JSON string
@@ -474,19 +475,19 @@ sequenceDiagram
 
         Svc->>AppCache: get(WEATHER_API)
         AppCache-->>Svc: URL template with placeholders
-        Svc->>Svc: Replace {city} and {apiKey} in URL
+        Svc->>Svc: Replace {lat}, {lon} and {apiKey} in URL
 
-        Svc->>API: GET http://api.weatherstack.com/current?...
-        API-->>Svc: { current: { temperature: 34, feelslike: 32 } }
+        Svc->>API: GET https://api.openweathermap.org/data/2.5/weather?...
+        API-->>Svc: { main: { temp: 307, feels_like: 305 }, weather: [...] }
 
-        Svc->>Redis: set("weather_of_mumbai", response, 300)
-        Redis->>Cache: SET weather_of_mumbai TTL=300s
+        Svc->>Redis: set("weather_of_28.6_77.2", response, 300)
+        Redis->>Cache: SET weather_of_28.6_77.2 TTL=300s
 
         Svc-->>Ctrl: WeatherResponse (from API)
     end
 
     Ctrl->>Ctrl: Build greeting message
-    Ctrl-->>Client: { data: "Hi johndoe, Weather feels like: 32°C" }
+    Ctrl-->>Client: { data: "Hi johndoe, Weather: clear sky, Feels like: 32°C" }
 ```
 
 ## 11. Error Handling - Detailed Flow

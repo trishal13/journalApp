@@ -16,7 +16,6 @@ import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.*;
@@ -26,14 +25,9 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class WeatherServiceTest {
 
-    @Mock
-    private RestTemplate restTemplate;
-
-    @Mock
-    private AppCache appCache;
-
-    @Mock
-    private RedisService redisService;
+    @Mock private RestTemplate restTemplate;
+    @Mock private AppCache appCache;
+    @Mock private RedisService redisService;
 
     @InjectMocks
     private WeatherService weatherService;
@@ -42,62 +36,40 @@ class WeatherServiceTest {
 
     @BeforeEach
     void setUp() {
-        ReflectionTestUtils.setField(weatherService, "apiKey", "test-weather-key");
-
+        ReflectionTestUtils.setField(weatherService, "apiKey", "test-key");
         weatherResponse = WeatherResponse.builder()
-                .current(WeatherResponse.Current.builder()
-                        .temperature(25)
-                        .feelslike(27)
-                        .humidity(60)
-                        .windSpeed(10)
-                        .weatherDescriptions(List.of("Sunny"))
-                        .build())
+                .main(WeatherResponse.Main.builder().temp(300.0).feelsLike(302.0).humidity(60).build())
                 .build();
-
-        // Set up the appCache map
         Map<String, String> cacheMap = new HashMap<>();
-        cacheMap.put("WEATHER_API", "http://api.weatherstack.com/current?access_key=<apiKey>&query=<city>");
+        cacheMap.put("WEATHER_API", "https://api.openweathermap.org/data/2.5/weather?lat=<lat>&lon=<lon>&appid=<apiKey>");
         appCache.appCache = cacheMap;
     }
 
     @Test
     void getWeather_shouldReturnCachedResponse_whenCacheHit() {
-        when(redisService.get("weather_of_mumbai", WeatherResponse.class)).thenReturn(weatherResponse);
-
-        WeatherResponse result = weatherService.getWeather("Mumbai");
-
+        when(redisService.get("weather_of_28.6_77.2", WeatherResponse.class)).thenReturn(weatherResponse);
+        WeatherResponse result = weatherService.getWeather(28.6, 77.2);
         assertThat(result).isEqualTo(weatherResponse);
         verify(restTemplate, never()).exchange(anyString(), any(), any(), eq(WeatherResponse.class));
     }
 
     @Test
     void getWeather_shouldCallApiAndCache_whenCacheMiss() {
-        when(redisService.get("weather_of_mumbai", WeatherResponse.class)).thenReturn(null);
+        when(redisService.get("weather_of_28.6_77.2", WeatherResponse.class)).thenReturn(null);
         when(restTemplate.exchange(anyString(), eq(HttpMethod.GET), isNull(), eq(WeatherResponse.class)))
                 .thenReturn(new ResponseEntity<>(weatherResponse, HttpStatus.OK));
 
-        WeatherResponse result = weatherService.getWeather("Mumbai");
+        WeatherResponse result = weatherService.getWeather(28.6, 77.2);
 
         assertThat(result).isEqualTo(weatherResponse);
-        verify(redisService).set(eq("weather_of_mumbai"), eq(weatherResponse), eq(300L));
+        verify(redisService).set(eq("weather_of_28.6_77.2"), eq(weatherResponse), eq(300L));
     }
 
     @Test
-    void getWeather_shouldThrowJournalAppException_whenApiFails() {
+    void getWeather_shouldThrow_whenApiFails() {
         when(redisService.get(anyString(), eq(WeatherResponse.class))).thenReturn(null);
         when(restTemplate.exchange(anyString(), eq(HttpMethod.GET), isNull(), eq(WeatherResponse.class)))
                 .thenThrow(new RuntimeException("API timeout"));
-
-        assertThatThrownBy(() -> weatherService.getWeather("Mumbai"))
-                .isInstanceOf(JournalAppException.class);
-    }
-
-    @Test
-    void getWeather_shouldNormalizeCityToLowercase_forCacheKey() {
-        when(redisService.get("weather_of_delhi", WeatherResponse.class)).thenReturn(weatherResponse);
-
-        weatherService.getWeather("DELHI");
-
-        verify(redisService).get("weather_of_delhi", WeatherResponse.class);
+        assertThatThrownBy(() -> weatherService.getWeather(28.6, 77.2)).isInstanceOf(JournalAppException.class);
     }
 }

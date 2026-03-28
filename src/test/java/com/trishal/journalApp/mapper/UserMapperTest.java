@@ -84,7 +84,26 @@ class UserMapperTest {
 
         UserResponseDto response = userMapper.toResponse(user);
 
-        // UserResponseDto should not have a password field at all
         assertThat(response).hasNoNullFieldsOrPropertiesExcept("email", "roles");
+    }
+
+    @Test
+    void toUpdateResponse_shouldMapFieldsWithoutPassword() {
+        User user = User.builder()
+                .userId(UUID.randomUUID())
+                .userName("testuser")
+                .password("super-secret")
+                .email("test@example.com")
+                .sentimentAnalysis(true)
+                .roles(List.of("USER", "ADMIN"))
+                .build();
+
+        com.trishal.journalApp.dto.UserUpdateResponseDto response = userMapper.toUpdateResponse(user);
+
+        assertThat(response.getUserId()).isEqualTo(user.getUserId());
+        assertThat(response.getUserName()).isEqualTo("testuser");
+        assertThat(response.getEmail()).isEqualTo("test@example.com");
+        assertThat(response.isSentimentAnalysis()).isTrue();
+        assertThat(response.getRoles()).containsExactlyInAnyOrder("USER", "ADMIN");
     }
 }

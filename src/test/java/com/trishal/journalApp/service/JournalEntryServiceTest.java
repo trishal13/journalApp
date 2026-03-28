@@ -60,6 +60,7 @@ class JournalEntryServiceTest {
 
     @Test
     void saveEntry_shouldSetSentimentAndUser_thenPersist() {
+        testUser.setSentimentAnalysis(true);
         when(userService.findByUserName("testuser")).thenReturn(testUser);
         when(geminiService.analyseSentiment(anyString())).thenReturn(Sentiment.HAPPY);
         when(journalEntryRepo.save(any(JournalEntry.class))).thenReturn(testEntry);
@@ -88,6 +89,7 @@ class JournalEntryServiceTest {
 
     @Test
     void saveEntry_shouldFallbackToExistingSentiment_whenGeminiFails() {
+        testUser.setSentimentAnalysis(true);
         when(userService.findByUserName("testuser")).thenReturn(testUser);
         when(geminiService.analyseSentiment(anyString()))
                 .thenThrow(new JournalAppException(
@@ -97,18 +99,18 @@ class JournalEntryServiceTest {
         JournalEntry entry = JournalEntry.builder()
                 .title("Test")
                 .content("Content")
-                .sentiment(Sentiment.SAD)
-                .build();
+                .build(); // sentiment is null → triggers Gemini
 
         journalEntryService.saveEntry(entry, "testuser");
 
-        // Should keep existing sentiment when Gemini fails
-        assertThat(entry.getSentiment()).isEqualTo(Sentiment.SAD);
+        // analyseSentimentSafely catches exception and returns existing (null)
+        assertThat(entry.getSentiment()).isNull();
         verify(journalEntryRepo).save(entry);
     }
 
     @Test
     void saveEntry_shouldThrowJournalAppException_whenRepoFails() {
+        testUser.setSentimentAnalysis(true);
         when(userService.findByUserName("testuser")).thenReturn(testUser);
         when(geminiService.analyseSentiment(anyString())).thenReturn(Sentiment.HAPPY);
         when(journalEntryRepo.save(any(JournalEntry.class))).thenThrow(new RuntimeException("DB error"));
@@ -123,10 +125,11 @@ class JournalEntryServiceTest {
 
     @Test
     void saveEntryUpdate_shouldReAnalyseSentiment() {
+        testUser.setSentimentAnalysis(true);
         when(geminiService.analyseSentiment(anyString())).thenReturn(Sentiment.ANXIOUS);
         when(journalEntryRepo.save(any(JournalEntry.class))).thenReturn(testEntry);
 
-        journalEntryService.saveEntry(testEntry);
+        journalEntryService.saveEntry(testEntry, testUser);
 
         assertThat(testEntry.getSentiment()).isEqualTo(Sentiment.ANXIOUS);
         verify(journalEntryRepo).save(testEntry);
@@ -197,15 +200,11 @@ class JournalEntryServiceTest {
 
     @Test
     void saveEntry_shouldKeepExistingSentiment_whenTextIsEffectivelyBlank() {
+        testUser.setSentimentAnalysis(true);
         when(userService.findByUserName("testuser")).thenReturn(testUser);
-        // When title is empty and content is empty, buildTextForAnalysis returns "."
-        // which is not blank, so Gemini is still called. Test that Gemini failure
-        // preserves existing sentiment instead.
-        when(geminiService.analyseSentiment(anyString()))
-                .thenThrow(new JournalAppException(
-                        com.trishal.journalApp.exception.ErrorCode.GEMINI_SERVICE_UNAVAILABLE));
         when(journalEntryRepo.save(any(JournalEntry.class))).thenReturn(testEntry);
 
+        // Entry has sentiment already set → Gemini is NOT called (condition: isEmpty(sentiment))
         JournalEntry entry = JournalEntry.builder()
                 .title("x")
                 .content("")
@@ -214,7 +213,7 @@ class JournalEntryServiceTest {
 
         journalEntryService.saveEntry(entry, "testuser");
 
-        // Should keep existing sentiment when Gemini fails
         assertThat(entry.getSentiment()).isEqualTo(Sentiment.ANGRY);
+        verify(geminiService, never()).analyseSentiment(anyString());
     }
 }

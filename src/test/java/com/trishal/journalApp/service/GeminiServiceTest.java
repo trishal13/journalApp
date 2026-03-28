@@ -1,6 +1,7 @@
 package com.trishal.journalApp.service;
 
 import com.trishal.journalApp.api.response.GeminiResponse;
+import com.trishal.journalApp.cache.AppCache;
 import com.trishal.journalApp.enums.Sentiment;
 import com.trishal.journalApp.exception.JournalAppException;
 import org.junit.jupiter.api.BeforeEach;
@@ -15,7 +16,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.client.RestTemplate;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -27,12 +30,19 @@ class GeminiServiceTest {
     @Mock
     private RestTemplate restTemplate;
 
+    @Mock
+    private AppCache appCache;
+
     private GeminiService geminiService;
 
     @BeforeEach
     void setUp() {
         geminiService = new GeminiService(restTemplate);
         ReflectionTestUtils.setField(geminiService, "apiKey", "test-api-key");
+        ReflectionTestUtils.setField(geminiService, "appCache", appCache);
+        Map<String, String> cacheMap = new HashMap<>();
+        cacheMap.put("GEMINI_API", "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent");
+        appCache.appCache = cacheMap;
     }
 
     private GeminiResponse buildGeminiResponse(String text) {

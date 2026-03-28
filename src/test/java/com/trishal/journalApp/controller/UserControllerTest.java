@@ -2,7 +2,10 @@ package com.trishal.journalApp.controller;
 
 import com.trishal.journalApp.api.response.WeatherResponse;
 import com.trishal.journalApp.dto.ApiResponse;
+import com.trishal.journalApp.dto.UserUpdateRequestDto;
+import com.trishal.journalApp.dto.UserUpdateResponseDto;
 import com.trishal.journalApp.entity.User;
+import com.trishal.journalApp.mapper.UserMapper;
 import com.trishal.journalApp.service.UserService;
 import com.trishal.journalApp.service.WeatherService;
 import org.junit.jupiter.api.AfterEach;
@@ -28,54 +31,45 @@ class UserControllerTest {
 
     @Mock private UserService userService;
     @Mock private WeatherService weatherService;
+    @Mock private UserMapper userMapper;
 
     @InjectMocks
     private UserController userController;
+
+    private User testUser;
 
     @BeforeEach
     void setUp() {
         var auth = new UsernamePasswordAuthenticationToken("testuser", null, List.of());
         SecurityContextHolder.getContext().setAuthentication(auth);
+        testUser = User.builder()
+                .userId(UUID.randomUUID()).userName("testuser").password("encoded").build();
     }
 
     @AfterEach
-    void tearDown() {
-        SecurityContextHolder.clearContext();
-    }
+    void tearDown() { SecurityContextHolder.clearContext(); }
 
     @Test
-    void updateUser_shouldUpdateUsernameAndPassword() {
-        User oldUser = User.builder()
-                .userId(UUID.randomUUID()).userName("testuser").password("oldEncoded").build();
-        User newUser = User.builder().userName("newname").password("newpassword").build();
-        when(userService.findByUserName("testuser")).thenReturn(oldUser);
+    void updateUser_shouldReturnUpdatedResponse() {
+        UserUpdateRequestDto dto = UserUpdateRequestDto.builder()
+                .userName("newname").password("newpass").build();
+        UserUpdateResponseDto responseDto = UserUpdateResponseDto.builder()
+                .userId(testUser.getUserId()).userName("newname").build();
 
-        ResponseEntity<ApiResponse<User>> response = userController.updateUser(newUser);
+        when(userService.findByUserName("testuser")).thenReturn(testUser);
+        when(userService.updateUser(testUser, dto)).thenReturn(testUser);
+        when(userMapper.toUpdateResponse(testUser)).thenReturn(responseDto);
+
+        ResponseEntity<ApiResponse<UserUpdateResponseDto>> response = userController.updateUser(dto);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody().isSuccess()).isTrue();
-        assertThat(oldUser.getUserName()).isEqualTo("newname");
-        assertThat(oldUser.getPassword()).isEqualTo("newpassword");
-        verify(userService).saveNewUser(oldUser);
-    }
-
-    @Test
-    void updateUser_shouldNotUpdateEmptyFields() {
-        User oldUser = User.builder()
-                .userId(UUID.randomUUID()).userName("testuser").password("oldEncoded").build();
-        User newUser = User.builder().userName("").password("").build();
-        when(userService.findByUserName("testuser")).thenReturn(oldUser);
-
-        userController.updateUser(newUser);
-
-        assertThat(oldUser.getUserName()).isEqualTo("testuser");
-        assertThat(oldUser.getPassword()).isEqualTo("oldEncoded");
+        assertThat(response.getBody().getData().getUserName()).isEqualTo("newname");
     }
 
     @Test
     void deleteUser_shouldReturnSuccess() {
         ResponseEntity<ApiResponse<Void>> response = userController.deleteUser();
-
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody().isSuccess()).isTrue();
         verify(userService).deleteByUserName("testuser");
@@ -83,23 +77,25 @@ class UserControllerTest {
 
     @Test
     void greetings_shouldIncludeWeatherInfo_whenAvailable() {
+        WeatherResponse.Main main = WeatherResponse.Main.builder().feelsLike(303.15).build();
         WeatherResponse weather = WeatherResponse.builder()
-                .current(WeatherResponse.Current.builder().feelslike(30).build())
+                .main(main)
+                .weather(List.of(WeatherResponse.Weather.builder().description("clear sky").build()))
                 .build();
-        when(weatherService.getWeather("Mumbai")).thenReturn(weather);
+        when(weatherService.getWeather(28.6, 77.2)).thenReturn(weather);
 
-        ResponseEntity<ApiResponse<String>> response = userController.greetings("Mumbai");
+        ResponseEntity<ApiResponse<String>> response = userController.greetings(28.6, 77.2);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody().isSuccess()).isTrue();
-        assertThat(response.getBody().getData()).contains("testuser").contains("30");
+        assertThat(response.getBody().getData()).contains("testuser").contains("clear sky");
     }
 
     @Test
     void greetings_shouldReturnGreetingOnly_whenWeatherIsNull() {
-        when(weatherService.getWeather("Mumbai")).thenReturn(null);
+        when(weatherService.getWeather(28.6, 77.2)).thenReturn(null);
 
-        ResponseEntity<ApiResponse<String>> response = userController.greetings("Mumbai");
+        ResponseEntity<ApiResponse<String>> response = userController.greetings(28.6, 77.2);
 
         assertThat(response.getBody().getData()).isEqualTo("Hi testuser");
     }

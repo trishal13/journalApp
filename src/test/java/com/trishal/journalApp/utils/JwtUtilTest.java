@@ -43,15 +43,10 @@ class JwtUtilTest {
     }
 
     @Test
-    void validateToken_shouldReturnFalse_forExpiredToken() throws Exception {
-        // Create a JwtUtil with very short expiry for testing
-        JwtUtil shortLivedJwtUtil = new JwtUtil();
-        ReflectionTestUtils.setField(shortLivedJwtUtil, "secretKey", "this-is-a-test-secret-key-32chars!");
-
-        // We can't easily test expiry without modifying the class,
-        // so we test that a valid token passes validation
-        String token = shortLivedJwtUtil.generateToken("testuser");
-        assertThat(shortLivedJwtUtil.validateToken(token, "testuser")).isTrue();
+    void validateToken_shouldReturnFalse_forDifferentUsername() {
+        String token = jwtUtil.generateToken("testuser");
+        boolean valid = jwtUtil.validateToken(token, "otheruser");
+        assertThat(valid).isFalse();
     }
 
     @Test

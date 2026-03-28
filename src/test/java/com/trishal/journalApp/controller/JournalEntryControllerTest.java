@@ -201,7 +201,7 @@ class JournalEntryControllerTest {
         assertThat(response.getBody().isSuccess()).isTrue();
         assertThat(testEntry.getTitle()).isEqualTo("Updated Title");
         assertThat(testEntry.getContent()).isEqualTo("Updated Content");
-        verify(journalEntryService).saveEntry(testEntry);
+        verify(journalEntryService).saveEntry(testEntry, testUser);
     }
 
     @Test
